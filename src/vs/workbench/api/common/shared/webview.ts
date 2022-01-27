@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { CharCode } from 'vs/base/common/charCode';
-import { Schemas } from 'vs/base/common/network';
+import { connectionTokenQueryName, RemoteAuthorities, Schemas } from 'vs/base/common/network';
 import { URI } from 'vs/base/common/uri';
 import type * as vscode from 'vscode';
 
@@ -45,6 +45,11 @@ export function asWebviewUri(
 	remoteInfo?: { authority: string | undefined, isRemote: boolean }
 ): vscode.Uri {
 	if (resource.scheme === Schemas.http || resource.scheme === Schemas.https) {
+		const token = RemoteAuthorities.getConnectionToken(resource.authority);
+		if (token && !resource.query) {
+			const tokenQuerySegment = connectionTokenQueryName + '=' + token
+			resource = resource.with({ query: resource.query ? resource.query + '&' + tokenQuerySegment : tokenQuerySegment })
+		}
 		return resource;
 	}
 

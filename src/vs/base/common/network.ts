@@ -130,6 +130,10 @@ class RemoteAuthoritiesImpl {
 		this._connectionTokens[authority] = connectionToken;
 	}
 
+	getConnectionToken(authority: string) {
+		return this._connectionTokens[authority];
+	}
+
 	rewrite(uri: URI): URI {
 		if (this._delegate) {
 			return this._delegate(uri);
