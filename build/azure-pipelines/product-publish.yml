@@ -114,20 +114,24 @@ steps:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     displayName: Determine if stage should succeed
 
-  - task: DeleteFiles@1
-    displayName: Remove artifact zip files
+  - task: CopyFiles@2
+    displayName: Copy artifacts
     inputs:
       SourceFolder: $(Agent.TempDirectory)
+      TargetFolder: $(Build.ArtifactStagingDirectory)
       Contents: |
-        *.zip
+        **\*.deb
+        **\*.rpm
+        **\*.snap
+        **\*.tar.gz
 
   - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
     displayName: Generate SBOM manifest
     inputs:
-      BuildDropPath: $(Agent.TempDirectory)
+      BuildDropPath: $(Build.ArtifactStagingDirectory)
       PackageName: Visual Studio Code
       PackageVersion: $(VERSION)
 
-  - publish: $(Agent.TempDirectory)/_manifest
+  - publish: $(Build.ArtifactStagingDirectory)/_manifest
     displayName: Publish SBOM manifest
     artifact: sbom
