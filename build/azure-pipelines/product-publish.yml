@@ -55,7 +55,9 @@ steps:
       $env:AZURE_CLIENT_SECRET = "$(AZURE_CLIENT_SECRET)"
       $VERSION = node -p "require('./package.json').version"
       Write-Host "Creating build with version: $VERSION"
+      Write-Host "##vso[task.setvariable variable=VERSION]$VERSION"
       exec { node build/azure-pipelines/common/createBuild.js $VERSION }
+
     displayName: Create build if it hasn't been created before
 
   - pwsh: |
@@ -123,6 +125,8 @@ steps:
     displayName: Generate SBOM manifest
     inputs:
       BuildDropPath: $(Agent.TempDirectory)
+      PackageName: Visual Studio Code
+      PackageVersion: $(VERSION)
 
   - publish: $(Agent.TempDirectory)/_manifest
     displayName: Publish SBOM manifest
