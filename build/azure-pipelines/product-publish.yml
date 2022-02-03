@@ -114,17 +114,6 @@ steps:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     displayName: Determine if stage should succeed
 
-  - task: CopyFiles@2
-    displayName: Copy artifacts
-    inputs:
-      SourceFolder: $(Agent.TempDirectory)
-      TargetFolder: $(Build.ArtifactStagingDirectory)
-      Contents: |
-        **\*.deb
-        **\*.rpm
-        **\*.snap
-        **\*.tar.gz
-
   - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
     displayName: Generate SBOM manifest
     inputs:

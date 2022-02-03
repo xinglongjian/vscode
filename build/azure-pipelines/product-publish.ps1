@@ -66,7 +66,7 @@ do {
 					Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
 				} -MaximumRetryCount 5 -RetryIntervalSec 1  | Out-Null
 
-				Expand-Archive -Path "$env:AGENT_TEMPDIRECTORY/$artifactName.zip" -DestinationPath $env:AGENT_TEMPDIRECTORY | Out-Null
+				Expand-Archive -Path "$env:AGENT_TEMPDIRECTORY/$artifactName.zip" -DestinationPath $env:BUILD_ARTIFACTSTAGINGDIRECTORY | Out-Null
 			} catch {
 				Write-Warning $_
 				$set.Remove($artifactName) | Out-Null
@@ -74,7 +74,7 @@ do {
 			}
 
 			$null,$product,$os,$arch,$type = $artifactName -split '_'
-			$asset = Get-ChildItem -rec "$env:AGENT_TEMPDIRECTORY/$artifactName"
+			$asset = Get-ChildItem -rec "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/$artifactName"
 			Write-Host "Processing artifact with the following values:"
 			# turning in into an object just to log nicely
 			@{
