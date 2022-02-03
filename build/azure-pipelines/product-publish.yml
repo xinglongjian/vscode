@@ -111,3 +111,19 @@ steps:
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     displayName: Determine if stage should succeed
+
+  - task: DeleteFiles@1
+    displayName: Remove artifact zip files
+    inputs:
+      SourceFolder: $(Agent.TempDirectory)
+      Contents: |
+        *.zip
+
+  - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
+    displayName: Generate SBOM manifest
+    inputs:
+      BuildDropPath: $(Agent.TempDirectory)
+
+  - publish: $(Agent.TempDirectory)/_manifest
+    displayName: Publish SBOM manifest
+    artifact: sbom
