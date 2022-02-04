@@ -555,6 +555,25 @@ suite('PausableEmitter', function () {
 
 suite('Event utils', () => {
 
+	test('dispose propagtes', function () {
+
+		const emitter = new Emitter<number>();
+
+		const evenNumbers: number[] = [];
+		const evenEvent = Event.filter(emitter.event, n => n % 2 === 0);
+
+		evenEvent(evenNumbers.push, evenNumbers);
+
+		emitter.fire(1);
+		emitter.fire(2);
+		emitter.fire(3);
+		emitter.fire(4);
+
+		emitter.dispose();
+
+
+	});
+
 	suite('EventBufferer', () => {
 
 		test('should not buffer when not wrapped', () => {

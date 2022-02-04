@@ -10,12 +10,15 @@ import { combinedDisposable, Disposable, DisposableStore, IDisposable, toDisposa
 import { LinkedList } from 'vs/base/common/linkedList';
 import { StopWatch } from 'vs/base/common/stopwatch';
 
+const _onDidDispose = Symbol('onDidDispose');
+
 /**
  * To an event a function with one or zero parameters
  * can be subscribed. The event is the subscriber function itself.
  */
 export interface Event<T> {
 	(listener: (e: T) => any, thisArgs?: any, disposables?: IDisposable[] | DisposableStore): IDisposable;
+	[_onDidDispose]?: Event<void>;
 }
 
 export namespace Event {
@@ -53,14 +56,14 @@ export namespace Event {
 	 * @deprecated DO NOT use, this leaks memory
 	 */
 	export function map<I, O>(event: Event<I>, map: (i: I) => O): Event<O> {
-		return snapshot((listener, thisArgs = null, disposables?) => event(i => listener.call(thisArgs, map(i)), null, disposables));
+		return snapshot(event, (listener, thisArgs = null, disposables?) => event(i => listener.call(thisArgs, map(i)), null, disposables));
 	}
 
 	/**
 	 * @deprecated DO NOT use, this leaks memory
 	 */
 	export function forEach<I>(event: Event<I>, each: (i: I) => void): Event<I> {
-		return snapshot((listener, thisArgs = null, disposables?) => event(i => { each(i); listener.call(thisArgs, i); }, null, disposables));
+		return snapshot(event, (listener, thisArgs = null, disposables?) => event(i => { each(i); listener.call(thisArgs, i); }, null, disposables));
 	}
 
 	/**
@@ -70,7 +73,7 @@ export namespace Event {
 	export function filter<T>(event: Event<T>, filter: (e: T) => boolean): Event<T>;
 	export function filter<T, R>(event: Event<T | R>, filter: (e: T | R) => e is R): Event<R>;
 	export function filter<T>(event: Event<T>, filter: (e: T) => boolean): Event<T> {
-		return snapshot((listener, thisArgs = null, disposables?) => event(e => filter(e) && listener.call(thisArgs, e), null, disposables));
+		return snapshot(event, (listener, thisArgs = null, disposables?) => event(e => filter(e) && listener.call(thisArgs, e), null, disposables));
 	}
 
 	/**
@@ -102,20 +105,21 @@ export namespace Event {
 		});
 	}
 
-	/**
-	 * @deprecated DO NOT use, this leaks memory
-	 */
-	function snapshot<T>(event: Event<T>): Event<T> {
+	function snapshot<T>(originalEvent: Event<any>, newEvent: Event<T>): Event<T> {
 		let listener: IDisposable;
 		const emitter = new Emitter<T>({
 			onFirstListenerAdd() {
-				listener = event(emitter.fire, emitter);
+				listener = newEvent(emitter.fire, emitter);
 			},
 			onLastListenerRemove() {
 				listener.dispose();
 			}
 		});
-
+		if (originalEvent[_onDidDispose]) {
+			originalEvent[_onDidDispose]!(() => {
+				emitter.dispose();
+			});
+		}
 		return emitter.event;
 	}
 
@@ -578,11 +582,14 @@ class Listener<T> {
 	}
  */
 export class Emitter<T> {
+
 	private readonly _options?: EmitterOptions;
 	private readonly _leakageMon?: LeakageMonitor;
 	private readonly _perfMon?: EventProfiling;
+
 	private _disposed: boolean = false;
 	private _event?: Event<T>;
+	private _didDisposeListener?: LinkedList<Listener<void>>;
 	private _deliveryQueue?: LinkedList<[Listener<T>, T]>;
 	protected _listeners?: LinkedList<Listener<T>>;
 
@@ -651,6 +658,22 @@ export class Emitter<T> {
 
 				return result;
 			};
+
+			this._event[_onDidDispose] = (callback: (e: void) => any, thisArgs?: any, disposables?: IDisposable[] | DisposableStore) => {
+				if (!this._didDisposeListener) {
+					this._didDisposeListener = new LinkedList();
+				}
+				const listener = new Listener(callback, thisArgs, undefined);
+				const remove = this._didDisposeListener.push(listener);
+				const disposable = toDisposable(remove);
+
+				if (disposables instanceof DisposableStore) {
+					disposables.add(disposable);
+				} else if (Array.isArray(disposables)) {
+					disposables.push(disposable);
+				}
+				return disposable;
+			};
 		}
 		return this._event;
 	}
@@ -709,6 +732,19 @@ export class Emitter<T> {
 			this._deliveryQueue?.clear();
 			this._options?.onLastListenerRemove?.();
 			this._leakageMon?.dispose();
+
+			// propagate disposing to download listeners
+			// this is a mechanism that exclusive to utils in this module
+			if (this._didDisposeListener) {
+				for (let listener of this._didDisposeListener) {
+					try {
+						listener.invoke();
+					} catch (err) {
+						onUnexpectedError(err);
+					}
+				}
+				this._didDisposeListener.clear();
+			}
 		}
 	}
 }
